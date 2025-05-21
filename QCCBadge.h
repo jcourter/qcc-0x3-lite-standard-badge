@@ -5,6 +5,8 @@
 // PIN MAP - Each I/O pin (used or unused) is defined . . .
 //                        19             // (A5) RESERVED for I2C
 //                        18             // (A4) RESERVED for I2C
+#define LED5_PIN          17             // Discrete LED around the circumference of the board
+#define LED4_PIN          16             // Discrete LED around the circumference of the board
 #define SAO_GPIO2         15             // (A1) Simple Add-On header GPIO2 pin
 #define SAO_GPIO1         14             // (A0) Simple Add-On header GPIO1 pin
 #define GREEN_LED_PIN     10             // RGB LED Green Pin
@@ -15,6 +17,8 @@
 #define RED_LED_PIN        6             // RGB LED Red Pin
 #define BLUE_LED_PIN       5             // RGB LED Blue Pin
 #define RADIO_SEEK_BUTTON  4             // Button to move to the next FM station (SW4)
+#define LED3_PIN           3             // Discrete LED around the circumference of the board
+#define LED2_PIN           2             // Discrete LED around the circumference of the board
 //                         D1 & D0          serial comm
 
 //----------------------------------------------------------------------------------------------+

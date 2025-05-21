@@ -34,6 +34,11 @@ void setup(){
   pinMode(VOL_UP_BUTTON,INPUT_PULLUP);
   pinMode(VOL_DN_BUTTON,INPUT_PULLUP);
 
+  pinMode(LED2_PIN,OUTPUT);
+  pinMode(LED3_PIN,OUTPUT);
+  pinMode(LED4_PIN,OUTPUT);
+  pinMode(LED5_PIN,OUTPUT);
+
   if(readButton(RADIO_SEEK_BUTTON)== LOW) {
 #if (DEBUG)
     Serial.println("Signal hunt mode enabled!");
@@ -69,6 +74,7 @@ void loop(){
   static unsigned int rgbValue = 0;
   static boolean rgbDirection = 0;
   static byte currentMorseMessage;
+  static byte ledmask = B11101110;
 
   if (cwTransmitEnabled) { //only do this if init function has been executed - this happens if someone presses the vol_up and vol_dn buttons simultaneously
     if(!morseSender->continueSending()) {
@@ -183,6 +189,16 @@ void loop(){
         analogWrite(GREEN_LED_PIN,rand()%256);
         analogWrite(BLUE_LED_PIN,rand()%256);
       }
+
+      // Do flashy things - first, write the lower four bytes of ledmask to LED2 through LED5,
+      // then we stick bit 0 into bit 5 and shift the bits to the right, creating a 4 bit rotation
+      digitalWrite(LED2_PIN,ledmask & 0x01);
+      digitalWrite(LED3_PIN,ledmask>>1 & 0x01);
+      digitalWrite(LED4_PIN,ledmask>>2 & 0x01);
+      digitalWrite(LED5_PIN,ledmask>>3 & 0x01);
+      ledmask&=0xf;
+      ledmask|=ledmask<<4 & 0x10;
+      ledmask=ledmask>>1;
     }
   }
 }
