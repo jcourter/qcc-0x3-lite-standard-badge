@@ -59,7 +59,7 @@ void setup(){
   }
 
   rx.setup(); // Starts the FM radio receiver with default parameters
-  rx.setBand(1);  // set the band to the Japanese broadcast band (76-91MHz), which overlaps nicely with the currently unused VHF TV channels 5 and 6 - code in the loop further limits this to 76-88MHz
+  rx.setBand(1);  // set the band to the Japanese broadcast band (76-91MHz), which overlaps nicely with the currently unused VHF TV channels 5 and 6 - code in the loop further limits this to between QCC_MIN_FREQ and QCC_MAX_FREQ
   rx.setVolume(7);  // Start at the middle of the volume range
   rx.setBass(true);  //Turn on extra bass for the tiny earphones
 
@@ -74,7 +74,7 @@ void loop(){
   static unsigned int rgbValue = 0;
   static boolean rgbDirection = 0;
   static byte currentMorseMessage;
-  static byte ledmask = B11101110;
+  static byte ledmask = B00001110;
 
   if (cwTransmitEnabled) { //only do this if init function has been executed - this happens if someone presses the vol_up and vol_dn buttons simultaneously
     if(!morseSender->continueSending()) {
@@ -175,11 +175,11 @@ void loop(){
         Serial.println(rssi);
   #endif
       }
-      if(freq>=8800) {
+      if(freq>=QCC_MAX_FREQ) {
 #if (DEBUG)
         Serial.println("Freq out of bounds, forcing seek");
 #endif
-        rx.setFrequency(7600);
+        rx.setFrequency(QCC_MIN_FREQ);
         rx.seek(RDA_SEEK_WRAP,RDA_SEEK_UP,NULL);
       }
       if (ledMode == LED_RSSI_MODE) {

@@ -38,6 +38,9 @@
 #define DEBOUNCE_MS          50         // buttom debounce period in mS
 #define INFINITY             65534      // if scalerPeriod is set to this value, it will just do a cumulative count forever
 
+#define QCC_MAX_FREQ       8800
+#define QCC_MIN_FREQ       7600
+
 //----------------------------------------------------------------------------------------------+
 //                                     Globals
 //----------------------------------------------------------------------------------------------+
