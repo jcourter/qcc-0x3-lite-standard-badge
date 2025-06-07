@@ -2,9 +2,9 @@
 
 <b>Badge Summary</b>
 
-The QCC 0x3 standard badge contains an RDA5807M FM radio receiver, an RGB LED, 4 discrete single color LEDs, and an ATmega328P microcontroller to manage it all.  The microcontroller runs at 8MHz, has been flashed with an Arduino bootloader, and a USB to TTL serial dongle has been included, so you can use the Arduino IDE to modify the code and upload it to the badge.  The badge is compatible with an Arduino Uno, so choose that in the IDE as your board type.
+The QCC 0x3 standard badge contains an RDA5807M FM radio receiver, an RGB LED, 4 discrete single color LEDs, and an ATmega328P microcontroller to manage it all.  The microcontroller runs at 8MHz, has been flashed with an Arduino bootloader, so you can use the Arduino IDE to modify the code and upload it to the badge.  The badge is compatible with an Arduino Pro Mini (8MHz/3.3v), so choose that in the IDE as your board type.
 
-NOTE FOR CTF PARTICIPANTS: The badge contains a flag which is not present in the public release of the source code.  If you are planning to work on the CTF badge challenge, I highly recommend you DO NOT re-flash the badge until you've completed it.
+<i><b>NOTE FOR CTF PARTICIPANTS:</b> The badge contains a flag which is not present in the public release of the source code.  If you are planning to work on the CTF badge challenge, I highly recommend you DO NOT re-flash the badge until you've completed it.</i>
 
 <b>Badge Operation</b>
 
