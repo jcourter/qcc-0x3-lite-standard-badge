@@ -8,6 +8,7 @@
 #include <Arduino.h>
 #include <EEPROM.h>
 #include <RDA5807.h> 
+#include <LowPower.h>
 #include "radioxmit.h"
 #include "QCCBadge.h"
 
@@ -39,42 +40,47 @@ void setup(){
   pinMode(LED4_PIN,OUTPUT);
   pinMode(LED5_PIN,OUTPUT);
 
+  Get_Settings();
+
   if(readButton(RADIO_SEEK_BUTTON)== LOW) {
 #if (DEBUG)
     Serial.println("Signal hunt mode enabled!");
 #endif
     ledMode = LED_RSSI_MODE;
+    EEPROM.update(LED_MODE_ADDR, ledMode);
   } else if(readButton(VOL_UP_BUTTON)== LOW) {
 #if (DEBUG)
     Serial.println("Random color mode enabled!");
 #endif
     ledMode = LED_RANDOM_MODE;
+    EEPROM.update(LED_MODE_ADDR, ledMode);
   } else if (readButton(VOL_DN_BUTTON) == LOW) {
 #if (DEBUG)
     Serial.println("Pulse mode enabled!");
 #endif
     ledMode = LED_PULSE_MODE;
-  } else {
-    ledMode = LED_RSSI_MODE;  // Ddefault to RSSI mode for the Lite badge
+    EEPROM.update(LED_MODE_ADDR, ledMode);
   }
 
   rx.setup(); // Starts the FM radio receiver with default parameters
   rx.setBand(1);  // set the band to the Japanese broadcast band (76-91MHz), which overlaps nicely with the currently unused VHF TV channels 5 and 6 - code in the loop further limits this to between QCC_MIN_FREQ and QCC_MAX_FREQ
+  rx.setStep(200);  // set tuning step to 200kHz
   rx.setVolume(7);  // Start at the middle of the volume range
   rx.setBass(true);  //Turn on extra bass for the tiny earphones
 
-  radioPeriodStart = millis();;     // start timers
+  radioPeriodStart = ledPeriodStart = logPeriodStart = millis();     // start timers
 }
 
 void loop(){
   static unsigned long lastButtonTime;  // counter for pressing the button too quickly
   static boolean blnLogStarted = false;
   static unsigned int lastFrequency = 0;
-  static unsigned int lastRssi = 65535;
+  static byte lastRssi = 0;
   static unsigned int rgbValue = 0;
   static boolean rgbDirection = 0;
   static byte currentMorseMessage;
   static byte ledmask = B00001110;
+  static unsigned long lastRssiLedUpdate = 0;
 
   if (cwTransmitEnabled) { //only do this if init function has been executed - this happens if someone presses the vol_up and vol_dn buttons simultaneously
     if(!morseSender->continueSending()) {
@@ -88,7 +94,7 @@ void loop(){
       morseSender->startSending();
     }
   } else {
-    if (ledMode == LED_PULSE_MODE) {
+    if (ledMode==LED_PULSE_MODE) {
       byte r, g, b;
       if (rgbDirection==0) {
         if (rgbValue>=65534) {
@@ -127,7 +133,8 @@ void loop(){
       rx.powerUp();
     } else {
       //TODO make this flip between con frequencies
-      rx.seek(RDA_SEEK_WRAP,RDA_SEEK_UP,NULL);
+      //rx.seek(RDA_SEEK_WRAP,RDA_SEEK_UP,NULL);
+      rx.setFrequencyUp();
     }
   }
  
@@ -160,11 +167,11 @@ void loop(){
     rx.setVolumeDown();
   }
 
-  if (millis() >= radioPeriodStart + 100){ //query the radio module every 100ms
-    radioPeriodStart = millis();          // reset the period time
+  if (millis() >= radioPeriodStart + 100) { //query the radio module every 100ms
+    radioPeriodStart=millis();             // reset the period time
     if(!cwTransmitEnabled) {
       unsigned int freq = rx.getRealFrequency();
-      unsigned int rssi = rx.getRssi();
+      byte rssi = (byte)rx.getRssi();
       if (freq!=lastFrequency || rssi!=lastRssi) {
         lastFrequency = freq;
         lastRssi = rssi;
@@ -177,31 +184,96 @@ void loop(){
       }
       if(freq>=QCC_MAX_FREQ) {
 #if (DEBUG)
-        Serial.println("Freq out of bounds, forcing seek");
+        Serial.println("Freq out of bounds");
 #endif
         rx.setFrequency(QCC_MIN_FREQ);
-        rx.seek(RDA_SEEK_WRAP,RDA_SEEK_UP,NULL);
+        //rx.seek(RDA_SEEK_WRAP,RDA_SEEK_UP,NULL);
       }
       if (ledMode == LED_RSSI_MODE) {
-        signalStrengthToRGB(rssi);  //Update the LED color based on the signal strength
+        signalStrengthToRGB(rssi);  //Update the LED color based on the signal strength        
       } else if (ledMode == LED_RANDOM_MODE) {
-        analogWrite(RED_LED_PIN,rand()%256);
-        analogWrite(GREEN_LED_PIN,rand()%256);
-        analogWrite(BLUE_LED_PIN,rand()%256);
+        analogWrite(RED_LED_PIN,(256-LED_MAX_INTENSITY)+rand()%LED_MAX_INTENSITY);
+        analogWrite(GREEN_LED_PIN,(256-LED_MAX_INTENSITY)+rand()%LED_MAX_INTENSITY);
+        analogWrite(BLUE_LED_PIN,(256-LED_MAX_INTENSITY)+rand()%LED_MAX_INTENSITY);
+        // stick bit 0 into bit 5 and shift the bits to the right, creating a 4 bit rotation
+        ledmask&=0xf;
+        ledmask|=ledmask<<4 & 0x10;
+        ledmask=ledmask>>1;
       }
 
-      // Do flashy things - first, write the lower four bytes of ledmask to LED2 through LED5,
-      // then we stick bit 0 into bit 5 and shift the bits to the right, creating a 4 bit rotation
+      // Light up the discrete LEDs with whatever is in the bitmask
       digitalWrite(LED2_PIN,ledmask & 0x01);
       digitalWrite(LED3_PIN,ledmask>>1 & 0x01);
       digitalWrite(LED4_PIN,ledmask>>2 & 0x01);
       digitalWrite(LED5_PIN,ledmask>>3 & 0x01);
+    }
+  }
+
+  if (ledMode == LED_RSSI_MODE) {
+    unsigned int ledInterval;
+    if (lastRssi < 50) {
+      ledInterval=2048;
+    } else if (lastRssi < 60) {
+      ledInterval=1024;
+    } else if (lastRssi < 70) {
+      ledInterval=512;
+    } else if (lastRssi < 80) {
+      ledInterval=256;
+    } else if (lastRssi < 90) {
+      ledInterval=128;
+    } else if (lastRssi < 100) {
+      ledInterval=64;
+    } else {
+      ledInterval=32;
+    }
+    if (millis() >= lastRssiLedUpdate + ledInterval) {  // The stronger the signal, the faster the LED blinky pattern
+      lastRssiLedUpdate = millis();
+      // stick bit 0 into bit 5 and shift the bits to the right, creating a 4 bit rotation
       ledmask&=0xf;
       ledmask|=ledmask<<4 & 0x10;
       ledmask=ledmask>>1;
+      // Light up the discrete LEDs with whatever is in the bitmask
+      digitalWrite(LED2_PIN,ledmask & 0x01);
+      digitalWrite(LED3_PIN,ledmask>>1 & 0x01);
+      digitalWrite(LED4_PIN,ledmask>>2 & 0x01);
+      digitalWrite(LED5_PIN,ledmask>>3 & 0x01);
     }
   }
+
+  if (millis() - ledPeriodStart >= 1000) {
+    ledPeriodStart = millis();
+
+    if (ledMode == LED_PULSE_MODE) {
+      ledmask--;
+      // Light up the discrete LEDs with whatever is in the bitmask
+      digitalWrite(LED2_PIN,ledmask & 0x01);
+      digitalWrite(LED3_PIN,ledmask>>1 & 0x01);
+      digitalWrite(LED4_PIN,ledmask>>2 & 0x01);
+      digitalWrite(LED5_PIN,ledmask>>3 & 0x01);
+    }
+  }
+
+   if (millis() >= logPeriodStart + LoggingPeriod && LoggingPeriod > 0){ // LOGGING PERIOD
+    logPeriodStart = millis(); // reset log time
+    Serial.print(logPeriodStart/60000,DEC);
+    Serial.write(',');
+    Serial.println(readVcc()/1000.0,2);
+  }
+  if (!cwTransmitEnabled) LowPower.idle(SLEEP_30MS, ADC_OFF, TIMER2_ON, TIMER1_ON, TIMER0_ON, SPI_OFF, USART0_ON, TWI_OFF);  //sleep for 30ms to save batteries
 }
+
+void Get_Settings(){ // get settings
+  LoggingPeriod = LOGGING_PERIOD;
+  LoggingPeriod *= 1000;
+
+  ledMode=EEPROM.read(LED_MODE_ADDR);
+  if (ledMode != LED_RSSI_MODE && ledMode != LED_RANDOM_MODE && ledMode !=LED_PULSE_MODE) {
+    ledMode = LED_RSSI_MODE;  // Default to RSSI mode for the Lite badge
+    EEPROM.update(LED_MODE_ADDR, ledMode);
+  }
+
+}
+
 
 unsigned long readVcc() { // SecretVoltmeter from TinkerIt
   unsigned long result;
@@ -216,27 +288,15 @@ unsigned long readVcc() { // SecretVoltmeter from TinkerIt
   return result;
 }
 
-static void signalStrengthToRGB(unsigned long signalStrength) {
+static void signalStrengthToRGB(byte signalStrength) {
   unsigned char r, g, b;
   unsigned long scaleMax;
   unsigned int scaledSignalStrength;
   float normalizedSignalStrength;
 
-  scaleMax = 100;            // we'll have full magenta at this number of counts per second
-/*#if (DEBUG)
-  Serial.print("signalStrength:");
-  Serial.print(signalStrength);
-  Serial.print(",");
-#endif*/
-  if (signalStrength<=30) {
-    signalStrength=0;
-  } else {
-    signalStrength-=30;
-  }
-  if (signalStrength)
-  if (signalStrength > scaleMax) signalStrength=scaleMax;
+  scaleMax = 127;            // we'll have full magenta at this signal strength
   
-  normalizedSignalStrength=sqrt((float)signalStrength/(float)scaleMax);
+  normalizedSignalStrength=(float)signalStrength/(float)scaleMax;
 
   if (normalizedSignalStrength > 1.0) normalizedSignalStrength=1.0;
   
@@ -363,16 +423,6 @@ void stopMorseSender() {
 //----------------------------------------------------------------------------------------------+
 //                                      Utilities
 //----------------------------------------------------------------------------------------------+
-
-void Blink(byte led, byte times){ // just to flash the LED
-  for (byte i=0; i< times; i++){
-    digitalWrite(led,LOW);
-    delay (150);
-    digitalWrite(led,HIGH);
-    delay (100);
-  }
-}
-
 
 // variables created by the build process when compiling the sketch
 extern int __bss_end;

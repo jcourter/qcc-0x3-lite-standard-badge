@@ -26,20 +26,22 @@
 //----------------------------------------------------------------------------------------------+
 #define BGYRM_SPECTRUM    true           // set to true for blue->green->yellow->red->magenta, set to false for green->yellow->red->magenta
 
-#define LED_MAX_INTENSITY   127         // maximum intensity for the LED
+#define LED_MAX_INTENSITY   15         // maximum intensity for the LED
 
-#define LED_RADIATION_MODE  0           //Show radiation level on the LED
 #define LED_RSSI_MODE       1           //Show signal strength on the LED
 #define LED_PULSE_MODE      2           //Make the LED slowly pulse
 #define LED_RANDOM_MODE     3           //The LED will flash random colors
+#define LED_RADIATION_MODE  4           //Show radiation level on the LED
+#define LED_MODE_ADDR       0x00        //EEPROM address for LED mode setting
 
-#define LOW_VCC            2900 //mV    // if Vcc < LOW_VCC give low voltage warning
 #define ONE_SEC_MAX          20         // elements in the oneSecond accumulator array
 #define DEBOUNCE_MS          50         // buttom debounce period in mS
 #define INFINITY             65534      // if scalerPeriod is set to this value, it will just do a cumulative count forever
 
-#define QCC_MAX_FREQ       8800
-#define QCC_MIN_FREQ       7600
+#define QCC_MAX_FREQ       7900		// max frequency for radio stations
+#define QCC_MIN_FREQ       7600		// min frequency for radio stations
+
+#define LOGGING_PERIOD    60            // defaults a 60 sec logging period
 
 //----------------------------------------------------------------------------------------------+
 //                                     Globals
@@ -49,7 +51,9 @@
 unsigned long LoggingPeriod;            // mS between writes to serial
 
 // variables for counting periods and counts . . .
-unsigned long radioPeriodStart;           // interval for checking signal strength
+unsigned long logPeriodStart;           // for logging period
+unsigned long radioPeriodStart;         // interval for checking signal strength
+unsigned long ledPeriodStart;           // interval for updating the discrete LEDs
 
 boolean cwTransmitEnabled = false;      // enables CW transmitter when set to true
 byte ledMode = 0;                       // current mode for the LED - see defines above
