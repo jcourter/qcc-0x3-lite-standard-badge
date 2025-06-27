@@ -40,8 +40,17 @@
 
 #define QCC_MAX_FREQ       7900		// max frequency for radio stations
 #define QCC_MIN_FREQ       7600		// min frequency for radio stations
+#define RADIO_MODE_QCC     0      // QCC mode - locks tuner to 76-79MHz
+#define RADIO_MODE_BCAST   1      // Broadcast mode - sets tuner for normal North America FM broadcast band
+#define RADIO_MODE_ADDR    0x01        //EEPROM address for radio mode setting
+
 
 #define LOGGING_PERIOD    60            // defaults a 60 sec logging period
+
+#define USE_OLED        true  // set to true to use an SSD1306 OLED display on the I2C bus
+
+// 0X3C+SA0 - 0x3C or 0x3D
+#define I2C_ADDRESS 0x3C  // I2C address for the SSD1306 display
 
 //----------------------------------------------------------------------------------------------+
 //                                     Globals
@@ -57,6 +66,7 @@ unsigned long ledPeriodStart;           // interval for updating the discrete LE
 
 boolean cwTransmitEnabled = false;      // enables CW transmitter when set to true
 byte ledMode = 0;                       // current mode for the LED - see defines above
+byte radioMode = 0;                       // current mode for the radio - see defines above
 static byte lastR, lastG, lastB = {0};  // stores the current RGB values for the LED
 
 byte TCCR1A_default;                    // stores the value of the TCCR1A register before we mess with it
@@ -64,6 +74,10 @@ byte TCCR1B_default;                    // stores the value of the TCCR1B regist
 byte OCR1A_default;                     // stores the value of the OCR1A register before we mess with it
 
 RDA5807 rx;                             // FM radio module
+
+#if (USE_OLED)
+SSD1306AsciiWire oled;                  //SSD1306 OLED display
+#endif
 
 MorseSender *morseSender;               // Morse code transmitter
 

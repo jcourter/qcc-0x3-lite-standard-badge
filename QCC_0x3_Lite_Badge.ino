@@ -9,19 +9,28 @@
 #include <EEPROM.h>
 #include <RDA5807.h> 
 #include <LowPower.h>
+#include <avr/wdt.h>
+#include <wire.h>
 #include "radioxmit.h"
+#include "SSD1306Ascii.h"
+#include "SSD1306AsciiWire.h"
 #include "QCCBadge.h"
 
 //----------------------------------------------------------------------------------------------+
 //                                     DEBUG Defines
 //----------------------------------------------------------------------------------------------+
-#define DEBUG          true            // if true, sends debug info to the serial port
+#define DEBUG          false            // if true, sends debug info to the serial port
 
 //----------------------------------------------------------------------------------------------+
 //                                      Functions
 //----------------------------------------------------------------------------------------------+
 
 void setup(){
+
+  wdt_disable();
+
+  Wire.begin();
+  Wire.setClock(100000L);  // Setting this to 400kHz will cause audible noise on the FM radio module
 
   Serial.begin(9600);                   // comspec 96,N,8,1
 
@@ -42,7 +51,11 @@ void setup(){
 
   Get_Settings();
 
-  if(readButton(RADIO_SEEK_BUTTON)== LOW) {
+  if(readButton(RADIO_SEEK_BUTTON)== LOW && readButton(VOL_UP_BUTTON)== LOW && readButton(VOL_DN_BUTTON) == LOW) {
+    if (radioMode==RADIO_MODE_QCC) radioMode=RADIO_MODE_BCAST;
+    else radioMode=RADIO_MODE_QCC;
+    EEPROM.update(RADIO_MODE_ADDR, radioMode);
+  } else if(readButton(RADIO_SEEK_BUTTON)== LOW) {
 #if (DEBUG)
     Serial.println("Signal hunt mode enabled!");
 #endif
@@ -63,12 +76,21 @@ void setup(){
   }
 
   rx.setup(); // Starts the FM radio receiver with default parameters
-  rx.setBand(1);  // set the band to the Japanese broadcast band (76-91MHz), which overlaps nicely with the currently unused VHF TV channels 5 and 6 - code in the loop further limits this to between QCC_MIN_FREQ and QCC_MAX_FREQ
-  rx.setStep(200);  // set tuning step to 200kHz
+  if (radioMode==RADIO_MODE_QCC) {
+    rx.setBand(1);  // set the band to the Japanese broadcast band (76-91MHz), which overlaps nicely with the currently unused VHF TV channels 5 and 6 - code in the loop further limits this to between QCC_MIN_FREQ and QCC_MAX_FREQ
+  } else {
+    rx.setBand(0); // NA/EU FM broadcast band
+  }
   rx.setVolume(7);  // Start at the middle of the volume range
   rx.setBass(true);  //Turn on extra bass for the tiny earphones
 
   radioPeriodStart = ledPeriodStart = logPeriodStart = millis();     // start timers
+
+#if (USE_OLED)
+  oledInit();
+#endif
+
+  wdt_enable(WDTO_2S);
 }
 
 void loop(){
@@ -76,6 +98,7 @@ void loop(){
   static boolean blnLogStarted = false;
   static unsigned int lastFrequency = 0;
   static byte lastRssi = 0;
+  static byte lastVolume = 0;
   static unsigned int rgbValue = 0;
   static boolean rgbDirection = 0;
   static byte currentMorseMessage;
@@ -132,9 +155,7 @@ void loop(){
       stopMorseSender();
       rx.powerUp();
     } else {
-      //TODO make this flip between con frequencies
-      //rx.seek(RDA_SEEK_WRAP,RDA_SEEK_UP,NULL);
-      rx.setFrequencyUp();
+      rx.setFrequency(rx.getRealFrequency()+20);  //doing it this way instead of setFrequencyUp() because setFrequencyUp sometimes doesn't work right and because the tuning step doesn't work right either
     }
   }
  
@@ -167,14 +188,17 @@ void loop(){
     rx.setVolumeDown();
   }
 
-  if (millis() >= radioPeriodStart + 100) { //query the radio module every 100ms
+  if (millis() >= radioPeriodStart + 333) { //query the radio module every 100ms
     radioPeriodStart=millis();             // reset the period time
     if(!cwTransmitEnabled) {
       unsigned int freq = rx.getRealFrequency();
       byte rssi = (byte)rx.getRssi();
-      if (freq!=lastFrequency || rssi!=lastRssi) {
+      byte volume = (byte)rx.getVolume();
+      if (freq!=lastFrequency || rssi!=lastRssi || volume!=lastVolume) {
         lastFrequency = freq;
         lastRssi = rssi;
+        lastVolume = volume;
+        oledUpdateFMInfo(freq, volume, rssi);
   #if (DEBUG)
         Serial.print("Tuned to ");
         Serial.print(freq);
@@ -182,12 +206,16 @@ void loop(){
         Serial.println(rssi);
   #endif
       }
-      if(freq>=QCC_MAX_FREQ) {
+      if(radioMode==RADIO_MODE_QCC && freq>=QCC_MAX_FREQ) {
 #if (DEBUG)
-        Serial.println("Freq out of bounds");
+        Serial.println(F("Freq out of bounds"));
 #endif
         rx.setFrequency(QCC_MIN_FREQ);
-        //rx.seek(RDA_SEEK_WRAP,RDA_SEEK_UP,NULL);
+      } else if (radioMode==RADIO_MODE_BCAST && (freq < 8710 || freq > 10790)) {
+#if (DEBUG)
+        Serial.println(F("Freq out of bounds"));
+#endif
+        rx.setFrequency(8710);
       }
       if (ledMode == LED_RSSI_MODE) {
         signalStrengthToRGB(rssi);  //Update the LED color based on the signal strength        
@@ -260,6 +288,44 @@ void loop(){
     Serial.println(readVcc()/1000.0,2);
   }
   if (!cwTransmitEnabled) LowPower.idle(SLEEP_30MS, ADC_OFF, TIMER2_ON, TIMER1_ON, TIMER0_ON, SPI_OFF, USART0_ON, TWI_OFF);  //sleep for 30ms to save batteries
+  wdt_reset();
+}
+
+void oledInit(){
+#if (USE_OLED)
+  oled.begin(&Adafruit128x64, I2C_ADDRESS);
+  oled.setFont(System5x7);
+  oled.clear();
+#endif
+}
+
+void oledUpdateFMInfo (unsigned int freq, byte volume, byte rssi) {
+#if (USE_OLED)
+  oled.setCursor(1,1);
+  for (char i = 0;i < 20*rssi/127;i++) {
+    //oled.print('█')
+    oled.print('*');
+  }
+  oled.clearToEOL();
+  oled.setCursor(1,2);
+  oled.set2X();
+  oled.print((int)freq/100);
+  oled.print('.');
+  oled.print((freq%100)/10);
+  if(freq < 10000) oled.print(' ');
+  oled.print(F(" MHz"));
+  oled.clearToEOL();
+  oled.setCursor(1,7);
+  oled.set1X();
+  oled.print(F("rssi: "));
+  oled.print(rssi);
+  if(rssi < 10) oled.print(' ');
+  if(rssi < 100) oled.print(' ');
+  oled.print(F("   vol:"));
+  if(volume < 10) oled.print(' ');
+  oled.print(volume);
+  oled.clearToEOL();
+#endif
 }
 
 void Get_Settings(){ // get settings
@@ -270,6 +336,11 @@ void Get_Settings(){ // get settings
   if (ledMode != LED_RSSI_MODE && ledMode != LED_RANDOM_MODE && ledMode !=LED_PULSE_MODE) {
     ledMode = LED_RSSI_MODE;  // Default to RSSI mode for the Lite badge
     EEPROM.update(LED_MODE_ADDR, ledMode);
+  }
+  radioMode=EEPROM.read(RADIO_MODE_ADDR);
+  if (radioMode != RADIO_MODE_QCC && radioMode != RADIO_MODE_BCAST) {
+    radioMode = RADIO_MODE_QCC;  // Default to QCC mode
+    EEPROM.update(RADIO_MODE_ADDR, radioMode);
   }
 
 }
