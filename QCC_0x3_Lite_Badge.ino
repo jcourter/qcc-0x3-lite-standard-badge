@@ -296,18 +296,20 @@ void oledInit(){
   oled.begin(&Adafruit128x64, I2C_ADDRESS);
   oled.setFont(System5x7);
   oled.clear();
+  oled.setCursor(1,5);
+  oled.print(F("Queen City Con 0x3"));
 #endif
 }
 
 void oledUpdateFMInfo (unsigned int freq, byte volume, byte rssi) {
 #if (USE_OLED)
-  oled.setCursor(1,1);
+  oled.setCursor(1,1);      // print the signal strength indicator on the top line
   for (char i = 0;i < 20*rssi/127;i++) {
-    //oled.print('█')
     oled.print('*');
   }
   oled.clearToEOL();
-  oled.setCursor(1,2);
+
+  oled.setCursor(1,2);      // display the current frequency in double sized font
   oled.set2X();
   oled.print((int)freq/100);
   oled.print('.');
@@ -315,7 +317,8 @@ void oledUpdateFMInfo (unsigned int freq, byte volume, byte rssi) {
   if(freq < 10000) oled.print(' ');
   oled.print(F(" MHz"));
   oled.clearToEOL();
-  oled.setCursor(1,7);
+
+  oled.setCursor(1,7);      // display the signal strength and current volume level
   oled.set1X();
   oled.print(F("rssi: "));
   oled.print(rssi);

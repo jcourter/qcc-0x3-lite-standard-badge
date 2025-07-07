@@ -67,7 +67,7 @@ unsigned long ledPeriodStart;           // interval for updating the discrete LE
 boolean cwTransmitEnabled = false;      // enables CW transmitter when set to true
 byte ledMode = 0;                       // current mode for the LED - see defines above
 byte radioMode = 0;                       // current mode for the radio - see defines above
-static byte lastR, lastG, lastB = {0};  // stores the current RGB values for the LED
+byte lastR = 0 , lastG = 0, lastB = 0;  // stores the current RGB values for the LED
 
 byte TCCR1A_default;                    // stores the value of the TCCR1A register before we mess with it
 byte TCCR1B_default;                    // stores the value of the TCCR1B register before we mess with it
