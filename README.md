@@ -16,7 +16,7 @@ To initiate the hidden signal for the CTF challenge, press SW2 and SW3 simultane
 
 <b>Alternate LED modes</b>
 
-If the ambient radiation level isn't generating enough visual stimulus for you, there are a couple of preprogrammed alternatives for the LED.
+There are a few different modes of operation for the LED.
 
 If you press and hold SW2 while powering on the badge, the RGB LED will flash random colors about every 100ms.
 
