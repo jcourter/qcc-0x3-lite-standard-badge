@@ -7,13 +7,13 @@
 #include <math.h>
 #include <Arduino.h>
 #include <EEPROM.h>
-#include <RDA5807.h> 
-#include <LowPower.h>
+#include <RDA5807.h>  //PU2CLR RDA5807 by Ricardo Lima
+#include <LowPower.h>  //Lowpower_LowPowerLab by LowPowerLab
 #include <avr/wdt.h>
 #include <wire.h>
+#include <SSD1306Ascii.h>  // SSD1306Ascii by Bill Greiman
+#include <SSD1306AsciiWire.h>
 #include "radioxmit.h"
-#include "SSD1306Ascii.h"
-#include "SSD1306AsciiWire.h"
 #include "QCCBadge.h"
 
 //----------------------------------------------------------------------------------------------+
